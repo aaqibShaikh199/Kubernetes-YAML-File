@@ -1,10 +1,33 @@
-apiVersion: karpenter.sh/v1beta1
+apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
-  name: default
+  name: <YOUR-NODE-POOL-NAME-HERE>
 spec:
+  # Optional overall limits – yahan CPU limit example ke liye
+  limits:
+    cpu: 1000
+
+  disruption:
+    # Nodes ko tab consolidate kare jab empty ya underutilized ho
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    # Kitne time baad consolidate kar sakta hai
+    consolidateAfter: 1m
+
   template:
+    # Optional: labels/annotations agar chaho to add kar sakte ho
+    metadata:
+      labels:
+        environment: "staging"
+        provisioner: "karpenter"
+
     spec:
+      # EC2NodeClass reference – upar wale naam se
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: <YOUR-EC2-NODE-CLASS-NAME-HERE>
+
+      # Node requirements
       requirements:
         - key: kubernetes.io/arch
           operator: In
@@ -12,18 +35,21 @@ spec:
         - key: kubernetes.io/os
           operator: In
           values: ["linux"]
+
+        # Only on-demand capacity
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+
+        # Instance category filter: c*, m*, r*
         - key: karpenter.k8s.aws/instance-category
           operator: In
           values: ["c", "m", "r"]
+
+        # Generation > 2 (so c5/m5/r5 and above)
         - key: karpenter.k8s.aws/instance-generation
           operator: Gt
           values: ["2"]
-      nodeClassRef:
-        apiVersion: karpenter.k8s.aws/v1beta1
-        kind: EC2NodeClass
-        name: default
-  limits:
-    cpu: 1000
-  disruption:
-    consolidationPolicy: WhenUnderutilized
-    expireAfter: 720h
+
+      # Nodes kitne time baad force expire honge
+      expireAfter: 720h  # 30 * 24h
